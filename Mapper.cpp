@@ -7,22 +7,21 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <map>
 
 using namespace std;
-using KeyCountPair= std::pair<std::string, int>;
+using KeyCountPair = std::pair<std::string, int>;
 
-pthread_mutex_t safe_lock= PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t safeLock = PTHREAD_MUTEX_INITIALIZER;
 
-// struct for thread so each thread writes a unique word to the pipe
 struct ThreadData 
 {
     vector<string> words;  
 };
 
-// thread function to process a chunk of words
-void* process_input_chunk(void* arg) 
+void* Splitting(void* arg) 
 {
-    ThreadData* data= (ThreadData*) arg;
+    ThreadData* data = (ThreadData*) arg;
     vector<KeyCountPair> word_count;
 
     for (const string& word : data->words) 
@@ -30,85 +29,98 @@ void* process_input_chunk(void* arg)
         word_count.emplace_back(word, 1);
     }
 
-    // write the output of mapper phase to the pipe
-    int pipe_fd= open("MapReduce", O_WRONLY);
+    pthread_exit((void*) new vector<KeyCountPair>(word_count)); 
+}
+
+void Shuffle(vector<KeyCountPair>& word_count) 
+{
+    map<string, vector<int>> grouped_data;
+    
+    for (const auto& pair : word_count) 
+    {
+        grouped_data[pair.first].push_back(pair.second);
+    }
+
+    int pipe_fd = open("MeraPyaraMapReducePipe", O_WRONLY);
     if (pipe_fd < 0) 
     {
         perror("Error opening Pipe for writing!");
-        pthread_exit(NULL);
+        return;
     }
 
-    // lock mutex before writing to pipe
-    pthread_mutex_lock(&safe_lock);
+    pthread_mutex_lock(&safeLock);
 
-    for (const auto& pair : word_count) 
+    for (const auto& entry : grouped_data) 
     {
-        string output= pair.first + " " + to_string(pair.second) + "\n";
-        write(pipe_fd, output.c_str(), output.size());
-        cout<<"Data written to pipe MapReduce: "<<output;  
+        for (size_t i = 0; i < entry.second.size(); i++) 
+        {
+            string output = entry.first + " " + to_string(1) + "\n";
+            write(pipe_fd, output.c_str(), output.size());
+            cout << "Data Sent To Reducer: " << output;
+        }
     }
 
-    pthread_mutex_unlock(&safe_lock);
+    pthread_mutex_unlock(&safeLock);
     close(pipe_fd);
-
-    pthread_exit(NULL);
 }
 
-// Mapper function
-void mapper(const string& user_input) 
+void Mapper(const string& userInput) 
 {
-    mkfifo("MapReduce", 0666);
+    mkfifo("MeraPyaraMapReducePipe", 0666);
 
-    vector<pthread_t> threads; // vector to hold threads
-    vector<string> words;
-    istringstream stream(user_input);
+    vector<pthread_t> threads;
+    vector<KeyCountPair> allKeyValuePairs;
+    
+    cout << "Data Splitting Successful.\n";
+    
+    istringstream stream(userInput);
     string word;
 
-    // input tokenization
+    vector<string> words;
     while (stream >> word) 
     {
         words.push_back(word);
     }
+    
+    cout << "Data Mapping Successful.\n";
 
-    int chunk_size= 2;
-    int num_chunks= (words.size() + chunk_size - 1) / chunk_size;
-
-    // process the chunk of words 
-    for (int i= 0; i < num_chunks; i++) 
+    for (size_t i = 0; i < words.size(); i++) 
     {
-        ThreadData* data= new ThreadData;
-        int start_index= i * chunk_size;
-        int end_index= min((i + 1) * chunk_size, (int)words.size());
-        for (int j= start_index; j < end_index; ++j) 
-        {
-            data->words.push_back(words[j]);
-        }
-        
+        ThreadData* data = new ThreadData{ {words[i]} };
         pthread_t thread;
-        pthread_create(&thread, NULL, process_input_chunk, (void*)data);
+        pthread_create(&thread, NULL, Splitting, (void*) data);
         threads.push_back(thread);
     }
 
-    // wait for threads to finish
-    for (pthread_t& thread : threads) 
+    // Wait for all threads to finish and collect the results
+    for (size_t i = 0; i < threads.size(); i++) 
     {
-        pthread_join(thread, NULL);
+        void* return_value;
+        pthread_join(threads[i], &return_value);
+        vector<KeyCountPair>* word_count = (vector<KeyCountPair>*) return_value;
+        allKeyValuePairs.insert(allKeyValuePairs.end(), word_count->begin(), word_count->end());
+        delete word_count;
     }
+    
+    cout << "Data Shuffling Successful.\n\n";
 
-    cout<<"Mapper: Key-Value pairs sent to Reducer!\n";
+    Shuffle(allKeyValuePairs);
+    
+    cout << "\nData Sent to Reducer Successfully.\n";
 }
 
 int main() 
 {
-    pthread_mutex_init(&safe_lock, NULL);
+    pthread_mutex_init(&safeLock, NULL);
 
-    cout<<"Enter the input text: ";
-    string user_input;
-    getline(cin, user_input);
+    cout << "Enter the Input Text: ";
+    string userInput;
+    getline(cin, userInput);
+    cout << endl;
 
-    mapper(user_input);
+    Mapper(userInput);
 
-    pthread_mutex_destroy(&safe_lock);
+    pthread_mutex_destroy(&safeLock);
 
     pthread_exit(NULL);
 }
