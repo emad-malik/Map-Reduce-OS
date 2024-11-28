@@ -5,38 +5,56 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <pthread.h>
+
 using namespace std;
 
-void reducer()
+void Reducer()
 {
-    int pipe_fd = open("MapReduce", O_RDONLY);
+    int pipe_fd = open("MeraPyaraMapReducePipe", O_RDONLY);
     if (pipe_fd < 0) 
     {
-        perror("Error opening MapPipe for reading!");
+        perror("Error opening MapReduce pipe for reading!");
         return;
     }
 
+    map<string, int> word_count_map;
     char buffer[1024];
     string data;
     ssize_t bytes_read;
 
-    // Read data from the pipe
     while ((bytes_read = read(pipe_fd, buffer, sizeof(buffer) - 1)) > 0) 
     {
         buffer[bytes_read] = '\0';
-        data += buffer;  // Append the data read from pipe to the string
+        data += buffer;
+
+        istringstream stream(data);
+        string word;
+        int count;
+
+        while (stream >> word >> count) 
+        {
+            cout << "Data Received From Mapper: " << word << " " << count << endl;
+            word_count_map[word] += count;
+        }
+
+        data.clear();
     }
+    
+    cout << "\nData Received From Mapper Successfully.\n";
     close(pipe_fd);
 
-    cout << "Reducer received raw data:\n" << data;
+    cout << "Data Reducing Successfully.\n";
 
-
-    // reducer phase logic -> collect data and aggregate it
-   
+    cout << "\n------ Final Result ------\n";
+    for (const auto& entry : word_count_map) 
+    {
+        cout << entry.first << " " << entry.second << endl;
+    }
 }
 
 int main()
 {
-    reducer();  // Call the reducer to process the data
+    Reducer();
     return 0;
 }
