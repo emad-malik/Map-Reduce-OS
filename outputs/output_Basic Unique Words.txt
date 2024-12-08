@@ -1,0 +1,8 @@
+
+Data Received From Mapper Successfully.
+Data Reducing Successfully.
+
+------ Final Result ------
+emad 1
+haider 1
+umema 1

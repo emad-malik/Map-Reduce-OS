@@ -1,0 +1,7 @@
+
+Data Received From Mapper Successfully.
+Data Reducing Successfully.
+
+------ Final Result ------
+hello 2
+world 2

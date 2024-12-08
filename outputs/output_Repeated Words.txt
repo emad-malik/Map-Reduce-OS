@@ -1,0 +1,8 @@
+
+Data Received From Mapper Successfully.
+Data Reducing Successfully.
+
+------ Final Result ------
+example 1
+map 3
+reduce 2

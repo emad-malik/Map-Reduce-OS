@@ -1,0 +1,7 @@
+
+Data Received From Mapper Successfully.
+Data Reducing Successfully.
+
+------ Final Result ------
+fast 1000
+nuces 1000

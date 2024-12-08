@@ -1,0 +1,6 @@
+
+Data Received From Mapper Successfully.
+Data Reducing Successfully.
+
+------ Final Result ------
+meow 6
